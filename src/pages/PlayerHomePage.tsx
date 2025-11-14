@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { getActiveGameRoom, getUserReserve, supabase, type Room, type Reserve } from '../lib/supabase'
+import { getActiveGameRoom, supabase, type Room } from '../lib/supabase'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 interface PlayerHomePageProps {
@@ -100,11 +100,6 @@ export default function PlayerHomePage({ userId, userName, onSignOut }: PlayerHo
 
   const handleJoinGame = () => {
     console.log('[PlayerHomePage] Joining game...')
-    navigate('/play')
-  }
-
-  const handleContinueGame = () => {
-    console.log('[PlayerHomePage] Continuing game...')
     navigate('/play')
   }
 

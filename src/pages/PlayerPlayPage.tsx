@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { colyseusClient } from '../lib/colyseus'
-import { getActiveGameRoom, getUserAllocations, getRoomEvents, supabase } from '../lib/supabase'
+import { getActiveGameRoom, getUserAllocations, getRoomEvents } from '../lib/supabase'
 import { usePlayerStateStore } from '../stores/playerStateStore'
 import { useGameRoomStore } from '../stores/gameRoomStore'
 import { useGameStateStore } from '../stores/gameStateStore'

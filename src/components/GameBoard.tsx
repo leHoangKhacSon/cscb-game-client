@@ -16,7 +16,7 @@ interface GameBoardProps {
   onBackToDashboard: () => void
 }
 
-export default function GameBoard({ room, gameState, userName, onSignOut, onBackToDashboard }: GameBoardProps) {
+export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps) {
   const [players, setPlayers] = useState<Map<string, PlayerState>>(new Map())
 
   // Setup message listeners for UI-specific events
