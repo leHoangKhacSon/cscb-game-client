@@ -25,4 +25,4 @@ export class GameRoomState extends Schema {
 export type {
   RoundStartedMessage,
   EventTriggeredMessage
-} from '@total-wealth/shared'
+} from '../types/index'
