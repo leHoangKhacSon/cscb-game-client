@@ -18,7 +18,6 @@ import CommunityIcon from '../../assets/icons/community.png'
 import EnvironmentIcon from '../../assets/icons/environment.png'
 
 interface GameCompletionScreenProps {
-  userName: string
   onComplete: () => void
 }
 
@@ -64,7 +63,7 @@ const FACTOR_ORDER: FactorKey[] = [
   'environment'  // right 5
 ]
 
-export default function GameCompletionScreen({ userName, onComplete }: GameCompletionScreenProps) {
+export default function GameCompletionScreen({ onComplete }: GameCompletionScreenProps) {
   const { playerScores } = usePlayerStateStore()
   const roomId = useGameRoomStore(state => state.roomId)
   const user = useAuthStore(state => state.user)
@@ -82,8 +81,18 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
 
     const loadPlayerScore = async () => {
       try {
+        // Check if using mock data
+        const isMockRoom = roomId === 'mock-room-123'
+        let supabaseClient = supabase
+
+        // Use mock client if needed
+        if (isMockRoom) {
+          const { createMockSupabaseClient } = await import('../../lib/mockSupabase')
+          supabaseClient = createMockSupabaseClient() as any
+        }
+
         // Lấy allocations
-        const { data: allocations } = await supabase
+        const { data: allocations } = await supabaseClient
           .from('allocations')
           .select('*')
           .eq('room_id', roomId)
@@ -91,7 +100,7 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
           .order('round', { ascending: true })
 
         // Lấy reserve
-        const { data: reserve } = await supabase
+        const { data: reserve } = await supabaseClient
           .from('reserves')
           .select('*')
           .eq('room_id', roomId)
@@ -99,7 +108,7 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
           .maybeSingle()
 
         // Lấy events
-        const { data: events } = await supabase
+        const { data: events } = await supabaseClient
           .from('events')
           .select('*')
           .eq('room_id', roomId)
@@ -133,30 +142,10 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
     )
   }, [playerScores, playerType, balanceIndex, impactIndex, efficiencyIndex, finalDestiny])
 
-  // Get top 3 factors
-  const topFactors = useMemo(() => {
-    const factorArray = Object.entries(playerScores)
-      .map(([key, value]) => ({
-        key: key as FactorKey,
-        value,
-        name: FACTOR_NAMES[key as FactorKey]
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 3)
-    
-    return factorArray
-  }, [playerScores])
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-green-50 flex flex-col items-center justify-center p-6">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-blue-700 mb-2">Cuộc Sống Của Bạn</h1>
-        <p className="text-gray-600">{userName}</p>
-      </div>
-
+    <div className="min-h-screen bg-white flex flex-col items-center p-2">
       {/* Scores Display */}
-      <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full mb-6">
+      <div className="p-8 w-full">
         <div className="space-y-4">
           {FACTOR_ORDER.slice(0, 5).map((leftKey, index) => {
             const rightKey = FACTOR_ORDER[index + 5]
@@ -183,68 +172,11 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
         </div>
       </div>
 
-      {/* Player Type & Life Summary */}
-      <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full mb-6">
-        <div className="text-center mb-4">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-4xl">{PLAYER_TYPES[playerType as keyof typeof PLAYER_TYPES]?.icon || '⚖️'}</span>
-            <h3 className="text-2xl font-bold text-purple-700">
-              {PLAYER_TYPES[playerType as keyof typeof PLAYER_TYPES]?.name || 'Người cân bằng'}
-            </h3>
-          </div>
-          <p className="text-sm text-gray-600 mb-4">
-            {playerTypeDescription}
-          </p>
-          <div className="flex justify-center gap-4 text-sm">
-            <div className="text-center">
-              <p className="text-gray-500">Final Destiny</p>
-              <p className="text-lg font-bold text-blue-600">{finalDestiny.toFixed(1)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-500">Balance</p>
-              <p className="text-lg font-bold text-green-600">{balanceIndex.toFixed(1)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-500">Impact</p>
-              <p className="text-lg font-bold text-purple-600">{impactIndex.toFixed(1)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="border-t pt-4">
-          <p className="text-gray-700 text-center leading-relaxed italic">
-            "{lifeSummary}"
-          </p>
-        </div>
+      <div className="py-16 px-6">
+        <p className="text-gray-700 text-center leading-relaxed">
+          "{playerTypeDescription}"
+        </p>
       </div>
-
-      {/* Top Factors */}
-      {topFactors.length > 0 && (
-        <div className="bg-blue-50 rounded-2xl p-6 max-w-md w-full mb-6">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">
-            Điểm mạnh của bạn
-          </h3>
-          <div className="flex justify-center gap-4">
-            {topFactors.map((factor, index) => (
-              <div key={factor.key} className="flex flex-col items-center">
-                <div className="relative">
-                  <img 
-                    src={FACTOR_ICONS[factor.key]} 
-                    alt={factor.name} 
-                    className="w-12 h-12"
-                  />
-                  {index === 0 && (
-                    <div className="absolute -top-2 -right-2 bg-yellow-400 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                      1
-                    </div>
-                  )}
-                </div>
-                <span className="text-xs text-gray-600 mt-1">{factor.name}</span>
-                <span className="text-sm font-bold text-blue-600">{factor.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Complete Button */}
       <button

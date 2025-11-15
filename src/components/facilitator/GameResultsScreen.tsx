@@ -20,6 +20,7 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
   const [results, setResults] = useState<PlayerResult[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'finalDestiny' | 'balanceIndex' | 'impactIndex' | 'efficiencyIndex'>('finalDestiny')
+  const [filterByType, setFilterByType] = useState<string>('all')
 
   useEffect(() => {
     loadGameResults()
@@ -29,8 +30,18 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
     try {
       setLoading(true)
 
+      // Check if using mock data
+      const isMockRoom = roomId === 'mock-room-123'
+      let supabaseClient = supabase
+
+      // Use mock client if needed
+      if (isMockRoom) {
+        const { createMockSupabaseClient } = await import('../../lib/mockSupabase')
+        supabaseClient = createMockSupabaseClient() as any
+      }
+
       // Lấy danh sách tất cả allocations trong room
-      const { data: allocations, error: allocError } = await supabase
+      const { data: allocations, error: allocError } = await supabaseClient
         .from('allocations')
         .select('*')
         .eq('room_id', roomId)
@@ -42,29 +53,37 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
       const userIds = [...new Set(allocations?.map(a => a.user_id) || [])]
 
       // Lấy profiles
-      const { data: profiles, error: profileError } = await supabase
+      const { data: profiles, error: profileError } = await supabaseClient
         .from('profiles')
         .select('*')
         .in('id', userIds)
 
       if (profileError) throw profileError
 
-      // Lấy reserves
-      const { data: reserves, error: reserveError } = await supabase
+      // Lấy reserves (không filter theo room_id vì Reserve table không có room_id)
+      const { data: reserves, error: reserveError } = await supabaseClient
         .from('reserves')
         .select('*')
-        .eq('room_id', roomId)
         .in('user_id', userIds)
 
       if (reserveError) throw reserveError
 
       // Lấy events
-      const { data: events, error: eventError } = await supabase
+      const { data: events, error: eventError } = await supabaseClient
         .from('events')
         .select('*')
         .eq('room_id', roomId)
 
       if (eventError) throw eventError
+
+      // Debug log
+      console.log('[GameResultsScreen] Data loaded:', {
+        allocationsCount: allocations?.length,
+        userIdsCount: userIds.length,
+        profilesCount: profiles?.length,
+        reservesCount: reserves?.length,
+        eventsCount: events?.length
+      })
 
       // Tính toán kết quả cho từng người chơi
       const playerResults: PlayerResult[] = userIds.map((userId, index) => {
@@ -73,7 +92,19 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
         const userReserve = reserves?.find(r => r.user_id === userId) || null
         const userEvents = events || []
 
+        console.log(`[GameResultsScreen] Processing user ${userId}:`, {
+          displayName: profile?.display_name,
+          allocationsCount: userAllocations.length,
+          hasReserve: !!userReserve
+        })
+
         const scoreData = calculatePlayerScore(userAllocations, userReserve, userEvents)
+
+        console.log(`[GameResultsScreen] Score for ${profile?.display_name}:`, {
+          finalDestiny: scoreData.finalDestiny,
+          balanceIndex: scoreData.balanceIndex,
+          playerType: scoreData.playerType
+        })
 
         return {
           userId,
@@ -98,7 +129,12 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
     }
   }
 
-  const sortedResults = [...results].sort((a, b) => {
+  // Filter and sort results
+  const filteredResults = filterByType === 'all' 
+    ? results 
+    : results.filter(r => r.playerType === filterByType)
+
+  const sortedResults = [...filteredResults].sort((a, b) => {
     switch (sortBy) {
       case 'finalDestiny':
         return b.finalDestiny - a.finalDestiny
@@ -112,6 +148,12 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
         return 0
     }
   })
+
+  // Count by player type
+  const playerTypeCounts = results.reduce((acc, r) => {
+    acc[r.playerType] = (acc[r.playerType] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
 
   const exportToCSV = (data: PlayerResult[]) => {
     const headers = [
@@ -202,6 +244,43 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          </div>
+        </div>
+
+        {/* Filter by Player Type */}
+        <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-pink-50">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-gray-700 font-medium">Lọc theo loại:</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterByType('all')}
+                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                  filterByType === 'all'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Tất cả ({results.length})
+              </button>
+              {Object.entries(PLAYER_TYPES).map(([type, info]) => {
+                const count = playerTypeCounts[type] || 0
+                if (count === 0) return null
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setFilterByType(type)}
+                    className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                      filterByType === type
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{info.icon}</span>
+                    <span>{info.name} ({count})</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
 
@@ -296,18 +375,84 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
           </div>
         )}
 
-        {/* Results Table */}
+        {/* Quick Summary Table */}
+        {sortedResults.length > 0 && (
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">📋 Bảng xếp hạng</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Hạng</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Người chơi</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Loại</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Final Destiny</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Balance</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Impact</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Efficiency</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {sortedResults.map((result, index) => {
+                    const playerTypeInfo = PLAYER_TYPES[result.playerType]
+                    const getRankBadge = (rank: number) => {
+                      if (rank === 1) return '🥇'
+                      if (rank === 2) return '🥈'
+                      if (rank === 3) return '🥉'
+                      return `${rank}`
+                    }
+                    
+                    return (
+                      <tr key={result.userId} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-lg font-bold">{getRankBadge(index + 1)}</td>
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="font-semibold text-gray-800">{result.displayName}</p>
+                            <p className="text-xs text-gray-500">{result.email}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{playerTypeInfo.icon}</span>
+                            <span className="text-sm font-medium text-purple-600">{playerTypeInfo.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-lg font-bold text-blue-600">{result.finalDestiny.toFixed(1)}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-lg font-semibold text-green-600">{result.balanceIndex.toFixed(1)}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-lg font-semibold text-purple-600">{result.impactIndex.toFixed(1)}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-lg font-semibold text-orange-600">{result.efficiencyIndex.toFixed(1)}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Detailed Results */}
         <div className="p-6">
           {sortedResults.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <p className="text-xl">Chưa có dữ liệu người chơi</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {sortedResults.map((result, index) => (
-                <PlayerResultCard key={result.userId} result={result} rank={index + 1} />
-              ))}
-            </div>
+            <>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 Chi tiết từng người chơi</h3>
+              <div className="space-y-6">
+                {sortedResults.map((result, index) => (
+                  <PlayerResultCard key={result.userId} result={result} rank={index + 1} />
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

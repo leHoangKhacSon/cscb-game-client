@@ -8,6 +8,8 @@ import FacilitatorHomePage from './pages/FacilitatorHomePage'
 import FacilitatorPlayPage from './pages/FacilitatorPlayPage'
 import PlayerHomePage from './pages/PlayerHomePage'
 import PlayerPlayPage from './pages/PlayerPlayPage'
+import PlayerResults from './pages/mock/PlayerResults'
+import FacilitatorResults from './pages/mock/FacilitatorResults'
 
 function App() {
   const { user, profile, loading, error, signOut, isFacilitator, isAuthenticated, needsDisplayName, updateDisplayName, initialize } = useAuthStore()
@@ -18,6 +20,20 @@ function App() {
 
   const handleSetDisplayName = async (displayName: string) => {
     await updateDisplayName(displayName)
+  }
+
+  // Check if on demo route - allow without auth
+  const isMockRoute = window.location.pathname.includes('/mock')
+
+  if (isMockRoute) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/mock/player-result" element={<PlayerResults />} />
+          <Route path="/mock/facilitator-result" element={<FacilitatorResults />} />
+        </Routes>
+      </BrowserRouter>
+    )
   }
 
   // Loading state
@@ -67,6 +83,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        
         {isFacilitator ? (
           // Facilitator routes
           <>

@@ -115,7 +115,7 @@ export default function PlayerGameScreen({
 
   // Show completion screen
   if (gameCompleted) {
-    return <GameCompletionScreen userName={userName} onComplete={handleComplete} />
+    return <GameCompletionScreen onComplete={handleComplete} />
   }
 
   if (!room) {
