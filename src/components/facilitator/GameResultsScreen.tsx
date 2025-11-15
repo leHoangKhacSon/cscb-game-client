@@ -2,19 +2,13 @@ import { useEffect, useState } from 'react'
 import { supabase, FACTOR_LABELS } from '../../lib/supabase'
 import { FactorKey } from '../../types/events'
 import LoadingSpinner from '../LoadingSpinner'
+import { calculatePlayerScore, PlayerScoreData, PLAYER_TYPES } from '../../lib/scoreCalculator'
 
-interface PlayerResult {
+interface PlayerResult extends PlayerScoreData {
   userId: string
   displayName: string
   email: string
-  finalScores: Record<FactorKey, number>
-  totalScore: number
-  averageScore: number
-  highestFactor: { factor: FactorKey; score: number }
-  lowestFactor: { factor: FactorKey; score: number }
-  consistency: number // Độ đồng đều phân bổ (0-100)
-  growthRate: number // Tốc độ tăng trưởng trung bình
-  allocationCount: number
+  rank: number
 }
 
 interface GameResultsScreenProps {
@@ -25,7 +19,7 @@ interface GameResultsScreenProps {
 export default function GameResultsScreen({ roomId, onClose }: GameResultsScreenProps) {
   const [results, setResults] = useState<PlayerResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [sortBy, setSortBy] = useState<'totalScore' | 'averageScore' | 'consistency'>('totalScore')
+  const [sortBy, setSortBy] = useState<'finalDestiny' | 'balanceIndex' | 'impactIndex' | 'efficiencyIndex'>('finalDestiny')
 
   useEffect(() => {
     loadGameResults()
@@ -38,27 +32,62 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
       // Lấy danh sách tất cả allocations trong room
       const { data: allocations, error: allocError } = await supabase
         .from('allocations')
-        .select('room_id, round, user_id, values')
+        .select('*')
         .eq('room_id', roomId)
         .order('round', { ascending: true })
 
       if (allocError) throw allocError
 
-      // Lấy danh sách profiles
+      // Lấy danh sách user IDs
       const userIds = [...new Set(allocations?.map(a => a.user_id) || [])]
+
+      // Lấy profiles
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select('id, email, display_name')
+        .select('*')
         .in('id', userIds)
 
       if (profileError) throw profileError
 
+      // Lấy reserves
+      const { data: reserves, error: reserveError } = await supabase
+        .from('reserves')
+        .select('*')
+        .eq('room_id', roomId)
+        .in('user_id', userIds)
+
+      if (reserveError) throw reserveError
+
+      // Lấy events
+      const { data: events, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('room_id', roomId)
+
+      if (eventError) throw eventError
+
       // Tính toán kết quả cho từng người chơi
-      const playerResults: PlayerResult[] = userIds.map(userId => {
+      const playerResults: PlayerResult[] = userIds.map((userId, index) => {
         const profile = profiles?.find(p => p.id === userId)
         const userAllocations = allocations?.filter(a => a.user_id === userId) || []
+        const userReserve = reserves?.find(r => r.user_id === userId) || null
+        const userEvents = events || []
 
-        return calculatePlayerResult(userId, profile, userAllocations)
+        const scoreData = calculatePlayerScore(userAllocations, userReserve, userEvents)
+
+        return {
+          userId,
+          displayName: profile?.display_name || 'Unknown',
+          email: profile?.email || '',
+          rank: index + 1,
+          ...scoreData
+        }
+      })
+
+      // Sắp xếp theo Final Destiny và cập nhật rank
+      playerResults.sort((a, b) => b.finalDestiny - a.finalDestiny)
+      playerResults.forEach((result, index) => {
+        result.rank = index + 1
       })
 
       setResults(playerResults)
@@ -69,121 +98,16 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
     }
   }
 
-  const calculatePlayerResult = (
-    userId: string,
-    profile: any,
-    allocations: any[]
-  ): PlayerResult => {
-    // Tính điểm cuối cùng (tổng hợp từ tất cả các rounds)
-    const finalScores: Record<FactorKey, number> = {
-      health: 0,
-      spiritual: 0,
-      intelligence: 0,
-      ai: 0,
-      emotion: 0,
-      career: 0,
-      finance: 0,
-      culture: 0,
-      community: 0,
-      environment: 0
-    }
-
-    allocations.forEach(allocation => {
-      let values: Record<string, number>
-      
-      if (typeof allocation.values === 'string') {
-        values = JSON.parse(allocation.values)
-      } else {
-        values = allocation.values as Record<string, number>
-      }
-
-      Object.entries(values).forEach(([factor, value]) => {
-        if (factor in finalScores) {
-          finalScores[factor as FactorKey] += value as number
-        }
-      })
-    })
-
-    // Tính các chỉ số phân tích
-    const scores = Object.values(finalScores)
-    const totalScore = scores.reduce((sum, score) => sum + score, 0)
-    const averageScore = totalScore / scores.length
-
-    const sortedScores = [...scores].sort((a, b) => b - a)
-    const highestScore = sortedScores[0]
-    const lowestScore = sortedScores[sortedScores.length - 1]
-
-    const highestFactor = Object.entries(finalScores).find(
-      ([_, score]) => score === highestScore
-    )!
-    const lowestFactor = Object.entries(finalScores).find(
-      ([_, score]) => score === lowestScore
-    )!
-
-    // Tính độ đồng đều (consistency) - dựa trên độ lệch chuẩn
-    const variance = scores.reduce((sum, score) => sum + Math.pow(score - averageScore, 2), 0) / scores.length
-    const stdDev = Math.sqrt(variance)
-    const consistency = Math.max(0, 100 - (stdDev / averageScore) * 100)
-
-    // Tính tốc độ tăng trưởng (growth rate)
-    let firstRoundTotal = 0
-    if (allocations[0]) {
-      let firstValues: Record<string, number>
-      if (typeof allocations[0].values === 'string') {
-        firstValues = JSON.parse(allocations[0].values)
-      } else {
-        firstValues = allocations[0].values as Record<string, number>
-      }
-      firstRoundTotal = Object.values(firstValues)
-        .reduce((sum: number, val) => sum + (val as number), 0)
-    }
-
-    let lastRoundTotal = 0
-    const lastAllocation = allocations[allocations.length - 1]
-    if (lastAllocation) {
-      let lastValues: Record<string, number>
-      if (typeof lastAllocation.values === 'string') {
-        lastValues = JSON.parse(lastAllocation.values)
-      } else {
-        lastValues = lastAllocation.values as Record<string, number>
-      }
-      lastRoundTotal = Object.values(lastValues)
-        .reduce((sum: number, val) => sum + (val as number), 0)
-    }
-
-    const growthRate = firstRoundTotal > 0 
-      ? ((lastRoundTotal - firstRoundTotal) / firstRoundTotal) * 100 
-      : 0
-
-    return {
-      userId,
-      displayName: profile?.display_name || 'Unknown',
-      email: profile?.email || '',
-      finalScores,
-      totalScore,
-      averageScore: Math.round(averageScore),
-      highestFactor: {
-        factor: highestFactor[0] as FactorKey,
-        score: highestFactor[1]
-      },
-      lowestFactor: {
-        factor: lowestFactor[0] as FactorKey,
-        score: lowestFactor[1]
-      },
-      consistency: Math.round(consistency),
-      growthRate: Math.round(growthRate),
-      allocationCount: allocations.length
-    }
-  }
-
   const sortedResults = [...results].sort((a, b) => {
     switch (sortBy) {
-      case 'totalScore':
-        return b.totalScore - a.totalScore
-      case 'averageScore':
-        return b.averageScore - a.averageScore
-      case 'consistency':
-        return b.consistency - a.consistency
+      case 'finalDestiny':
+        return b.finalDestiny - a.finalDestiny
+      case 'balanceIndex':
+        return b.balanceIndex - a.balanceIndex
+      case 'impactIndex':
+        return b.impactIndex - a.impactIndex
+      case 'efficiencyIndex':
+        return b.efficiencyIndex - a.efficiencyIndex
       default:
         return 0
     }
@@ -194,10 +118,11 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
       'Hạng',
       'Tên',
       'Email',
-      'Tổng điểm',
-      'Điểm TB',
-      'Độ đồng đều (%)',
-      'Tốc độ tăng trưởng (%)',
+      'Final Destiny',
+      'Balance Index',
+      'Impact Index',
+      'Efficiency Index',
+      'Loại người chơi',
       'Sức khỏe',
       'Tâm linh',
       'Trí tuệ',
@@ -214,20 +139,21 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
       index + 1,
       result.displayName,
       result.email,
-      result.totalScore,
-      result.averageScore,
-      result.consistency,
-      result.growthRate,
-      result.finalScores.health,
-      result.finalScores.spiritual,
-      result.finalScores.intelligence,
-      result.finalScores.ai,
-      result.finalScores.emotion,
-      result.finalScores.career,
-      result.finalScores.finance,
-      result.finalScores.culture,
-      result.finalScores.community,
-      result.finalScores.environment
+      result.finalDestiny,
+      result.balanceIndex,
+      result.impactIndex,
+      result.efficiencyIndex,
+      PLAYER_TYPES[result.playerType].name,
+      result.lifetimeWealthScores.health,
+      result.lifetimeWealthScores.spiritual,
+      result.lifetimeWealthScores.intelligence,
+      result.lifetimeWealthScores.ai,
+      result.lifetimeWealthScores.emotion,
+      result.lifetimeWealthScores.career,
+      result.lifetimeWealthScores.finance,
+      result.lifetimeWealthScores.culture,
+      result.lifetimeWealthScores.community,
+      result.lifetimeWealthScores.environment
     ])
 
     const csvContent = [
@@ -262,11 +188,11 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg z-10">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-3xl font-bold mb-2">🏆 Kết Quả Trò Chơi</h2>
-              <p className="text-blue-100">Phân tích chi tiết điểm số và xu hướng của người chơi</p>
+              <p className="text-blue-100">Phân tích chi tiết theo công thức Final Destiny</p>
             </div>
             <button
               onClick={onClose}
@@ -286,34 +212,44 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
               <span className="text-gray-700 font-medium">Sắp xếp theo:</span>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setSortBy('totalScore')}
+                  onClick={() => setSortBy('finalDestiny')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
-                    sortBy === 'totalScore'
+                    sortBy === 'finalDestiny'
                       ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  Tổng điểm
+                  Final Destiny
                 </button>
                 <button
-                  onClick={() => setSortBy('averageScore')}
+                  onClick={() => setSortBy('balanceIndex')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
-                    sortBy === 'averageScore'
+                    sortBy === 'balanceIndex'
                       ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  Điểm TB
+                  Balance
                 </button>
                 <button
-                  onClick={() => setSortBy('consistency')}
+                  onClick={() => setSortBy('impactIndex')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
-                    sortBy === 'consistency'
+                    sortBy === 'impactIndex'
                       ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  Độ đồng đều
+                  Impact
+                </button>
+                <button
+                  onClick={() => setSortBy('efficiencyIndex')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    sortBy === 'efficiencyIndex'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Efficiency
                 </button>
               </div>
             </div>
@@ -339,21 +275,21 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
                 <p className="text-3xl font-bold text-blue-600">{sortedResults.length}</p>
               </div>
               <div className="bg-white rounded-lg p-4 shadow">
-                <p className="text-sm text-gray-500 mb-1">Điểm TB chung</p>
+                <p className="text-sm text-gray-500 mb-1">Final Destiny TB</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {Math.round(sortedResults.reduce((sum, r) => sum + r.averageScore, 0) / sortedResults.length)}
+                  {Math.round(sortedResults.reduce((sum, r) => sum + r.finalDestiny, 0) / sortedResults.length)}
                 </p>
               </div>
               <div className="bg-white rounded-lg p-4 shadow">
-                <p className="text-sm text-gray-500 mb-1">Điểm cao nhất</p>
+                <p className="text-sm text-gray-500 mb-1">Balance TB</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {sortedResults[0]?.totalScore.toLocaleString()}
+                  {Math.round(sortedResults.reduce((sum, r) => sum + r.balanceIndex, 0) / sortedResults.length)}
                 </p>
               </div>
               <div className="bg-white rounded-lg p-4 shadow">
-                <p className="text-sm text-gray-500 mb-1">Độ đồng đều TB</p>
+                <p className="text-sm text-gray-500 mb-1">Impact TB</p>
                 <p className="text-3xl font-bold text-orange-600">
-                  {Math.round(sortedResults.reduce((sum, r) => sum + r.consistency, 0) / sortedResults.length)}%
+                  {Math.round(sortedResults.reduce((sum, r) => sum + r.impactIndex, 0) / sortedResults.length)}
                 </p>
               </div>
             </div>
@@ -389,13 +325,7 @@ function PlayerResultCard({ result, rank }: { result: PlayerResult; rank: number
     return `#${rank}`
   }
 
-  const getOverallRating = (result: PlayerResult) => {
-    const score = (result.averageScore + result.consistency) / 2
-    if (score >= 80) return '⭐⭐⭐ Xuất sắc'
-    if (score >= 60) return '⭐⭐ Tốt'
-    if (score >= 40) return '⭐ Trung bình'
-    return '📊 Cần cải thiện'
-  }
+  const playerTypeInfo = PLAYER_TYPES[result.playerType]
 
   return (
     <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
@@ -408,22 +338,30 @@ function PlayerResultCard({ result, rank }: { result: PlayerResult; rank: number
           <div className="flex items-center gap-4">
             <span className="text-2xl font-bold">{getRankBadge(rank)}</span>
             <div>
-              <h3 className="text-lg font-bold text-gray-800">{result.displayName}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-gray-800">{result.displayName}</h3>
+                <span className="text-2xl">{playerTypeInfo.icon}</span>
+                <span className="text-sm font-semibold text-purple-600">{playerTypeInfo.name}</span>
+              </div>
               <p className="text-sm text-gray-500">{result.email}</p>
             </div>
           </div>
           <div className="flex items-center gap-6">
             <div className="text-center">
-              <p className="text-sm text-gray-500">Tổng điểm</p>
-              <p className="text-2xl font-bold text-blue-600">{result.totalScore.toLocaleString()}</p>
+              <p className="text-sm text-gray-500 mb-1">Final Destiny</p>
+              <p className="text-2xl font-bold text-blue-600">{result.finalDestiny.toFixed(1)}</p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-500">Điểm TB</p>
-              <p className="text-xl font-semibold text-gray-700">{result.averageScore}</p>
+              <p className="text-sm text-gray-500 mb-1">Balance</p>
+              <p className="text-xl font-semibold text-green-600">{result.balanceIndex.toFixed(1)}</p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-500">Độ đồng đều</p>
-              <p className="text-xl font-semibold text-green-600">{result.consistency}%</p>
+              <p className="text-sm text-gray-500 mb-1">Impact</p>
+              <p className="text-xl font-semibold text-purple-600">{result.impactIndex.toFixed(1)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-1">Efficiency</p>
+              <p className="text-xl font-semibold text-orange-600">{result.efficiencyIndex.toFixed(1)}</p>
             </div>
             <button className="text-gray-400 hover:text-gray-600">
               <svg
@@ -442,12 +380,17 @@ function PlayerResultCard({ result, rank }: { result: PlayerResult; rank: number
       {/* Detailed Stats */}
       {expanded && (
         <div className="p-6 bg-white border-t">
+          <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <h4 className="font-semibold text-purple-800 mb-2">{playerTypeInfo.icon} {playerTypeInfo.name}</h4>
+            <p className="text-sm text-purple-700">{playerTypeInfo.description}</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-6">
-            {/* Factor Scores */}
+            {/* Lifetime Wealth Scores */}
             <div>
-              <h4 className="font-semibold text-gray-800 mb-3">📊 Điểm theo chỉ số</h4>
+              <h4 className="font-semibold text-gray-800 mb-3">📊 Lifetime Wealth Scores</h4>
               <div className="space-y-2">
-                {Object.entries(result.finalScores)
+                {Object.entries(result.lifetimeWealthScores)
                   .sort(([, a], [, b]) => b - a)
                   .map(([factor, score]) => (
                     <div key={factor} className="flex items-center justify-between">
@@ -458,7 +401,9 @@ function PlayerResultCard({ result, rank }: { result: PlayerResult; rank: number
                         <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-blue-500"
-                            style={{ width: `${(score / result.totalScore) * 100}%` }}
+                            style={{ 
+                              width: `${Math.min(100, (score / Math.max(...Object.values(result.lifetimeWealthScores))) * 100)}%` 
+                            }}
                           />
                         </div>
                         <span className="text-sm font-semibold text-gray-700 w-16 text-right">
@@ -472,35 +417,35 @@ function PlayerResultCard({ result, rank }: { result: PlayerResult; rank: number
 
             {/* Analytics */}
             <div>
-              <h4 className="font-semibold text-gray-800 mb-3">📈 Phân tích</h4>
+              <h4 className="font-semibold text-gray-800 mb-3">📈 Phân tích chi tiết</h4>
               <div className="space-y-3">
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Chỉ số mạnh nhất</p>
-                  <p className="font-semibold text-green-700">
-                    {FACTOR_LABELS[result.highestFactor.factor]} ({result.highestFactor.score})
-                  </p>
-                </div>
-                <div className="bg-orange-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Chỉ số yếu nhất</p>
-                  <p className="font-semibold text-orange-700">
-                    {FACTOR_LABELS[result.lowestFactor.factor]} ({result.lowestFactor.score})
-                  </p>
-                </div>
                 <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Tốc độ tăng trưởng</p>
+                  <p className="text-sm text-gray-600 mb-1">Final Destiny Score</p>
                   <p className="font-semibold text-blue-700">
-                    {result.growthRate > 0 ? '+' : ''}{result.growthRate}%
+                    {result.finalDestiny.toFixed(2)} = 0.4×{result.balanceIndex.toFixed(1)} + 0.3×{result.impactIndex.toFixed(1)} + 0.3×{result.efficiencyIndex.toFixed(1)}
                   </p>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Balance Index (100 - SD)</p>
+                  <p className="font-semibold text-green-700">{result.balanceIndex.toFixed(2)}</p>
                 </div>
                 <div className="bg-purple-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Số lượt phân bổ</p>
-                  <p className="font-semibold text-purple-700">{result.allocationCount} lượt</p>
+                  <p className="text-sm text-gray-600 mb-1">Impact Index (Culture+Community+Environment)/3</p>
+                  <p className="font-semibold text-purple-700">{result.impactIndex.toFixed(2)}</p>
+                </div>
+                <div className="bg-orange-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Efficiency Index</p>
+                  <p className="font-semibold text-orange-700">
+                    {result.efficiencyIndex.toFixed(2)}% = {result.totalEffective}/{result.totalAllocations + result.reservesTotal}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Tổng điểm phân bổ</p>
+                  <p className="font-semibold text-gray-700">{result.totalAllocations}</p>
                 </div>
                 <div className="bg-yellow-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Đánh giá tổng quan</p>
-                  <p className="font-semibold text-yellow-700">
-                    {getOverallRating(result)}
-                  </p>
+                  <p className="text-sm text-gray-600 mb-1">Kho dự trữ</p>
+                  <p className="font-semibold text-yellow-700">{result.reservesTotal}</p>
                 </div>
               </div>
             </div>

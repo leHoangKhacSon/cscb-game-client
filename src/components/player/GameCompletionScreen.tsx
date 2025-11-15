@@ -1,5 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { usePlayerStateStore } from '../../stores/playerStateStore'
+import { useGameRoomStore } from '../../stores/gameRoomStore'
+import { useAuthStore } from '../../stores/authStore'
+import { supabase } from '../../lib/supabase'
+import { calculatePlayerScore, PLAYER_TYPES } from '../../lib/scoreCalculator'
 
 // Import PNG icons
 import HealthIcon from '../../assets/icons/health.png'
@@ -62,11 +66,72 @@ const FACTOR_ORDER: FactorKey[] = [
 
 export default function GameCompletionScreen({ userName, onComplete }: GameCompletionScreenProps) {
   const { playerScores } = usePlayerStateStore()
+  const roomId = useGameRoomStore(state => state.roomId)
+  const user = useAuthStore(state => state.user)
+  
+  const [playerType, setPlayerType] = useState<string>('balanced')
+  const [playerTypeDescription, setPlayerTypeDescription] = useState<string>('')
+  const [finalDestiny, setFinalDestiny] = useState<number>(0)
+  const [balanceIndex, setBalanceIndex] = useState<number>(0)
+  const [impactIndex, setImpactIndex] = useState<number>(0)
+  const [efficiencyIndex, setEfficiencyIndex] = useState<number>(0)
 
-  // Calculate life summary based on scores
+  // Load and calculate player score using official formula
+  useEffect(() => {
+    if (!roomId || !user?.id) return
+
+    const loadPlayerScore = async () => {
+      try {
+        // Lấy allocations
+        const { data: allocations } = await supabase
+          .from('allocations')
+          .select('*')
+          .eq('room_id', roomId)
+          .eq('user_id', user.id)
+          .order('round', { ascending: true })
+
+        // Lấy reserve
+        const { data: reserve } = await supabase
+          .from('reserves')
+          .select('*')
+          .eq('room_id', roomId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        // Lấy events
+        const { data: events } = await supabase
+          .from('events')
+          .select('*')
+          .eq('room_id', roomId)
+
+        // Tính toán điểm theo công thức chính thức
+        const scoreData = calculatePlayerScore(allocations || [], reserve, events || [])
+        
+        setPlayerType(scoreData.playerType)
+        setPlayerTypeDescription(PLAYER_TYPES[scoreData.playerType].description)
+        setFinalDestiny(scoreData.finalDestiny)
+        setBalanceIndex(scoreData.balanceIndex)
+        setImpactIndex(scoreData.impactIndex)
+        setEfficiencyIndex(scoreData.efficiencyIndex)
+      } catch (error) {
+        console.error('Error calculating player score:', error)
+      }
+    }
+
+    loadPlayerScore()
+  }, [roomId, user?.id])
+
+  // Calculate life summary based on player type and scores
   const lifeSummary = useMemo(() => {
-    return generateLifeSummary(playerScores as unknown as Record<string, number>)
-  }, [playerScores])
+    return generateLifeSummary(
+      playerScores as unknown as Record<string, number>,
+      playerType,
+      balanceIndex,
+      impactIndex,
+      efficiencyIndex,
+      finalDestiny
+    )
+  }, [playerScores, playerType, balanceIndex, impactIndex, efficiencyIndex, finalDestiny])
 
   // Get top 3 factors
   const topFactors = useMemo(() => {
@@ -118,11 +183,38 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
         </div>
       </div>
 
-      {/* Life Summary */}
+      {/* Player Type & Life Summary */}
       <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full mb-6">
-        <p className="text-gray-700 text-center leading-relaxed italic">
-          "{lifeSummary}"
-        </p>
+        <div className="text-center mb-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-4xl">{PLAYER_TYPES[playerType as keyof typeof PLAYER_TYPES]?.icon || '⚖️'}</span>
+            <h3 className="text-2xl font-bold text-purple-700">
+              {PLAYER_TYPES[playerType as keyof typeof PLAYER_TYPES]?.name || 'Người cân bằng'}
+            </h3>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            {playerTypeDescription}
+          </p>
+          <div className="flex justify-center gap-4 text-sm">
+            <div className="text-center">
+              <p className="text-gray-500">Final Destiny</p>
+              <p className="text-lg font-bold text-blue-600">{finalDestiny.toFixed(1)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-500">Balance</p>
+              <p className="text-lg font-bold text-green-600">{balanceIndex.toFixed(1)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-500">Impact</p>
+              <p className="text-lg font-bold text-purple-600">{impactIndex.toFixed(1)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="border-t pt-4">
+          <p className="text-gray-700 text-center leading-relaxed italic">
+            "{lifeSummary}"
+          </p>
+        </div>
       </div>
 
       {/* Top Factors */}
@@ -165,71 +257,53 @@ export default function GameCompletionScreen({ userName, onComplete }: GameCompl
   )
 }
 
-// Generate life summary based on scores using data science approach
-function generateLifeSummary(scores: Record<string, number>): string {
-  const total = Object.values(scores).reduce((sum, val) => sum + val, 0)
-  const average = total / 10
-  
-  // Calculate balance (standard deviation)
-  const variance = Object.values(scores).reduce((sum, val) => {
-    return sum + Math.pow(val - average, 2)
-  }, 0) / 10
-  const stdDev = Math.sqrt(variance)
-  
-  // Normalize standard deviation (0-1 scale, lower is more balanced)
-  const balanceScore = Math.max(0, 1 - (stdDev / average))
-  
-  // Get dominant factors (top 3)
-  const sortedFactors = Object.entries(scores)
-    .sort(([, a], [, b]) => b - a)
-  
+// Generate life summary based on player type and official scores
+function generateLifeSummary(
+  scores: Record<string, number>,
+  playerType: string,
+  balanceIndex: number,
+  impactIndex: number,
+  efficiencyIndex: number,
+  finalDestiny: number
+): string {
+  // Get dominant factors
+  const sortedFactors = Object.entries(scores).sort(([, a], [, b]) => b - a)
   const topFactor = sortedFactors[0]
   const topFactorName = FACTOR_NAMES[topFactor[0] as FactorKey]
-  const topFactorValue = topFactor[1]
   
-  // Determine life archetype based on patterns
   let description = ''
   
-  // High balance (balanced life)
-  if (balanceScore > 0.7) {
-    description = 'Bạn sống cân bằng, hài hòa. Ở tuổi 120, bạn mang theo sự bình an và để lại một di sản tinh thần đáng nhớ.'
-  }
-  // High top factor dominance
-  else if (topFactorValue > average * 1.5) {
-    if (topFactor[0] === 'health') {
-      description = 'Bạn sống khỏe mạnh, năng động. Ở tuổi 120, bạn vẫn tràn đầy sức sống và truyền cảm hứng cho nhiều thế hệ.'
-    } else if (topFactor[0] === 'finance') {
-      description = 'Bạn sống sung túc, thịnh vượng. Ở tuổi 120, bạn để lại một gia tài vật chất đáng kể cho con cháu.'
-    } else if (topFactor[0] === 'intelligence') {
-      description = 'Bạn sống với trí tuệ, học hỏi không ngừng. Ở tuổi 120, bạn là nguồn tri thức quý báu cho cộng đồng.'
-    } else if (topFactor[0] === 'spiritual') {
-      description = 'Bạn sống sâu sắc, tâm linh. Ở tuổi 120, bạn đạt được sự giác ngộ và bình an nội tâm.'
-    } else if (topFactor[0] === 'career') {
-      description = 'Bạn sống với sự nghiệp rực rỡ. Ở tuổi 120, bạn để lại dấu ấn nghề nghiệp đáng tự hào.'
-    } else if (topFactor[0] === 'community') {
-      description = 'Bạn sống vì cộng đồng, giúp đỡ người khác. Ở tuổi 120, bạn được nhiều người kính trọng và nhớ đến.'
-    } else {
-      description = `Bạn tập trung vào ${topFactorName}. Ở tuổi 120, bạn đạt được thành tựu đáng kể trong lĩnh vực này.`
-    }
-  }
-  // Low balance (imbalanced life)
-  else if (balanceScore < 0.3) {
-    description = 'Bạn sống nhẹ nhàng, sâu sắc. Ở tuổi 120, bạn mang theo sự bình an và để lại một di sản tinh thần đáng nhớ.'
-  }
-  // Moderate - check for specific patterns
-  else {
-    // Check if health is low
-    if (scores.health < average * 0.5) {
-      description = `Bạn sống với nhiều thử thách sức khỏe. Ở tuổi 120, bạn học được giá trị của việc chăm sóc bản thân.`
-    }
-    // Check if finance is low
-    else if (scores.finance < average * 0.5) {
-      description = `Bạn sống giản dị, không vướng bận vật chất. Ở tuổi 120, bạn tìm thấy hạnh phúc trong những điều giản đơn.`
-    }
-    // Default moderate life
-    else {
-      description = `Bạn sống nhẹ nhàng, sâu sắc. Ở tuổi 120, bạn mang theo sự bình an và để lại một di sản tinh thần đáng nhớ.`
-    }
+  // Generate summary based on player type
+  switch (playerType) {
+    case 'legend':
+      description = `Bạn đã đạt được sự cân bằng hoàn hảo trong cuộc sống với Final Destiny ${finalDestiny.toFixed(1)}. Ở tuổi 120, bạn là huyền thoại sống, để lại di sản vĩ đại cho nhân loại. Bạn xuất sắc ở ${topFactorName} và cân bằng tất cả các khía cạnh khác.`
+      break
+      
+    case 'true_wealth':
+      description = `Bạn sống giàu có thật sự, không chỉ về vật chất mà còn về tinh thần. Với Impact Index ${impactIndex.toFixed(1)} và Efficiency ${efficiencyIndex.toFixed(1)}%, bạn tạo ra giá trị to lớn cho cộng đồng. Ở tuổi 120, bạn được tôn vinh như một người có đóng góp xuất sắc cho xã hội.`
+      break
+      
+    case 'successful_unfulfilled':
+      description = `Bạn thành công rực rỡ về ${topFactorName}, nhưng thiếu sự cân bằng (Balance Index ${balanceIndex.toFixed(1)}). Ở tuổi 120, bạn nhận ra rằng thành công thật sự không chỉ nằm ở một khía cạnh. Bạn ước mình đã dành nhiều thời gian hơn cho gia đình và bản thân.`
+      break
+      
+    case 'survivor':
+      description = `Bạn đã trải qua nhiều thử thách và sử dụng hết nguồn lực sớm để vượt qua khó khăn. Ở tuổi 120, bạn tự hào về sức mạnh và khả năng phục hồi của mình. Bạn học được rằng cuộc sống không phải về việc có bao nhiêu, mà là về cách vượt qua nghịch cảnh.`
+      break
+      
+    case 'balanced':
+    default:
+      // Phân tích dựa trên các chỉ số
+      if (balanceIndex >= 70) {
+        description = `Bạn sống cân bằng và hài hòa với Balance Index ${balanceIndex.toFixed(1)}. Ở tuổi 120, bạn mang theo sự bình an và hạnh phúc từ việc phát triển đều đặn mọi khía cạnh cuộc sống. Bạn đặc biệt xuất sắc ở ${topFactorName}.`
+      } else if (impactIndex >= 60) {
+        description = `Bạn sống có ý nghĩa với Impact Index ${impactIndex.toFixed(1)}, đóng góp tích cực cho cộng đồng và môi trường. Ở tuổi 120, bạn được nhớ đến như một người đã làm cho thế giới tốt đẹp hơn, đặc biệt qua ${topFactorName}.`
+      } else if (efficiencyIndex >= 60) {
+        description = `Bạn sống hiệu quả với Efficiency Index ${efficiencyIndex.toFixed(1)}%, tận dụng tốt mọi nguồn lực. Ở tuổi 120, bạn tự hào về cách mình quản lý cuộc sống, đặc biệt thành công trong ${topFactorName}.`
+      } else {
+        description = `Bạn sống theo cách riêng của mình, tập trung vào ${topFactorName}. Ở tuổi 120, bạn nhận ra rằng hạnh phúc không đến từ sự hoàn hảo, mà từ việc sống trung thực với chính mình.`
+      }
+      break
   }
   
   return description
