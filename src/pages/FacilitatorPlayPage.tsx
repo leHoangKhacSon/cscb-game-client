@@ -17,7 +17,7 @@ export default function FacilitatorPlayPage({
   const navigate = useNavigate()
   const room = useGameRoomStore(state => state.room)
   const clearRoom = useGameRoomStore(state => state.clearRoom)
-  const gameState = useGameStateStore(state => state.gameState)
+  const { gameState } = useGameStateStore()
   const setGameState = useGameStateStore(state => state.setGameState)
   const updateGameState = useGameStateStore(state => state.setGameState)
   const clearGameState = useGameStateStore(state => state.clearGameState)

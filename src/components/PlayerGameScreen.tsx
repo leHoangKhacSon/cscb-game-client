@@ -24,7 +24,8 @@ export default function PlayerGameScreen({
   const { room } = useGameRoomStore()
   const { user } = useAuthStore()
   const { addAllocationData, allocations, allocationHistory, resetAllocations } = usePlayerStateStore()
-  const { dbRoomId, currentRound, currentRoundStatus, currentRoundEvent } = useGameStateStore(state => state.gameState)
+  const { gameState } = useGameStateStore()
+  const { dbRoomId, currentRound, currentRoundStatus, currentRoundEvent } = gameState
 
   const [showEventModal, setShowEventModal] = useState(false)
   const [previousRound, setPreviousRound] = useState(currentRound)

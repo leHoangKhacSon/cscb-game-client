@@ -96,7 +96,7 @@ const factorIconsArray = [
 
 export default function PlayerReserves({
 }: PlayerReservesProps) {
-  const gameState = useGameStateStore(state => state.gameState)
+  const { gameState } = useGameStateStore()
   const { room } = useGameRoomStore()
   const { user } = useAuthStore()
   const { playerScores, addAllocationData, allocations, setFactorValue, resetAllocations } = usePlayerStateStore()
