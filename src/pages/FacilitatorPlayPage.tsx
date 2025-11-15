@@ -36,15 +36,14 @@ export default function FacilitatorPlayPage({
 
     // Extract initial state
     if (room.state) {
-      // const initialState = extractGameState(room.state)
-      setGameState({ ...room.state })
+      setGameState(room.state)
     }
 
     // Listen to state changes
     room.onStateChange((state) => {
       console.log('[FacilitatorPlayPage] Full state change', state)
       // const stateData = extractGameState(state)
-      setGameState({ ...state })
+      setGameState(state)
     })
 
     room.onMessage('session_ended', () => {
