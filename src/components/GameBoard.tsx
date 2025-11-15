@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import doneIcon from '../assets/icons/done.png'
 import progressIcon from '../assets/icons/progress.png'
-import { GameRoomState, PlayerState } from '../types/colyseus'
+import { GameRoomState } from '../types/colyseus'
 import EventWheel from './EventWheel'
 import MainBoard from './MainBoard'
 import { EVENTS, FACTORS } from '../constants/events'
@@ -22,7 +22,6 @@ interface GameBoardProps {
 export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps) {
   const navigate = useNavigate()
 
-  const [players, setPlayers] = useState<Map<string, PlayerState>>(new Map())
   const [rotation, setRotation] = useState(0)
 
   // Setup message listeners for UI-specific events
@@ -35,13 +34,6 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
       console.log('[GameBoard] Cleaning up UI listeners')
     }
   }, [room])
-
-  // Update players when gameState changes
-  useEffect(() => {
-    if (gameState.players) {
-      setPlayers(new Map(gameState.players))
-    }
-  }, [gameState])
 
   // Handle round start
   const handleStartRound = (round: number) => {
@@ -192,7 +184,7 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
             {/* Round Number */}
             <div className="bg-green-100 rounded-2xl p-4 text-center">
               <p className="text-sm text-gray-600 mb-1">Vòng chơi</p>
-              <p className="text-5xl font-bold text-green-600">{gameState.currentRound}</p>
+              <p className="text-5xl font-bold text-green-600">{gameState.currentRound + 17}</p>
             </div>
 
             {/* Timer */}
@@ -247,7 +239,7 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
               <h3 className="font-semibold text-gray-700">Người tham gia</h3>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">
-                  {Array.from(players.values()).filter(p => p.hasFilled).length}/{gameState.playerCount}
+                  {Array.from(gameState.players.values()).filter(p => p.hasFilled).length}/{gameState.playerCount}
                 </span>
                 <span className="text-2xl font-bold text-green-600">
                   {gameState.playerCount}/500
@@ -255,7 +247,7 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
               </div>
             </div>
             <div className="flex-1 overflow-y-auto space-y-2">
-              {Array.from(players.values()).map((player) => (
+              {Array.from(gameState.players.values()).map((player) => (
                 <div key={player.userId} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500">{player.userId.slice(0, 4)}</span>
