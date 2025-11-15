@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import logoutIcon from '../assets/icons/logout.png'
-import { getActiveGameRoom, supabase, type Room } from '../lib/supabase'
+import { getActiveGameRoom, type Room } from '../lib/supabase'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 interface PlayerHomePageProps {
@@ -11,7 +11,7 @@ interface PlayerHomePageProps {
   onSignOut: () => void
 }
 
-export default function PlayerHomePage({ userId, userName, onSignOut }: PlayerHomePageProps) {
+export default function PlayerHomePage({ userName, onSignOut }: PlayerHomePageProps) {
   const navigate = useNavigate()
   const [activeSession, setActiveSession] = useState<Room | null>(null)
   const [loading, setLoading] = useState(true)
@@ -29,55 +29,6 @@ export default function PlayerHomePage({ userId, userName, onSignOut }: PlayerHo
     hasFetchedRef.current = true
     checkGameStatus()
   }, []) // Empty deps - only run once
-
-  // Track user online status with heartbeat
-  // useEffect(() => {
-  //   const setupHeartbeat = async () => {
-  //     try {
-  //       const { data: { user } } = await supabase.auth.getUser()
-  //       if (!user) return
-
-  //       // Update last_seen timestamp
-  //       const updateOnlineStatus = async () => {
-  //         const { error } = await supabase
-  //           .from('profiles')
-  //           .update({ last_seen: new Date().toISOString() })
-  //           .eq('id', user.id)
-
-  //         if (error) {
-  //           console.error('[PlayerHomePage] Error updating last_seen:', error)
-  //         } else {
-  //           console.log('[PlayerHomePage] Last seen updated')
-  //         }
-  //       }
-
-  //       // Initial update
-  //       await updateOnlineStatus()
-
-  //       // Update every 30 seconds
-  //       const heartbeatInterval = setInterval(updateOnlineStatus, 30000)
-
-  //       // Cleanup: set last_seen to null when leaving
-  //       return () => {
-  //         console.log('[PlayerHomePage] Clearing last_seen')
-  //         clearInterval(heartbeatInterval)
-  //         supabase
-  //           .from('profiles')
-  //           .update({ last_seen: null })
-  //           .eq('id', user.id)
-  //           .then(() => console.log('[PlayerHomePage] Last seen cleared'))
-  //       }
-  //     } catch (err) {
-  //       console.error('[PlayerHomePage] Error setting up heartbeat:', err)
-  //     }
-  //   }
-
-  //   const cleanup = setupHeartbeat()
-    
-  //   return () => {
-  //     cleanup.then((fn) => fn && fn())
-  //   }
-  // }, [userId, userName])
 
   const checkGameStatus = async () => {
     try {

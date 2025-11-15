@@ -142,6 +142,8 @@ export default function GameCompletionScreen({ onComplete }: GameCompletionScree
     )
   }, [playerScores, playerType, balanceIndex, impactIndex, efficiencyIndex, finalDestiny])
 
+  console.log('[GameCompletionScreen] lifeSummary:', lifeSummary)
+
   return (
     <div className="min-h-screen bg-white flex flex-col items-center p-2">
       {/* Scores Display */}
