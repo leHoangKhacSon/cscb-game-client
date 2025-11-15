@@ -5,21 +5,18 @@ import { usePlayerStateStore } from '../stores/playerStateStore'
 import { useGameRoomStore } from '../stores/gameRoomStore'
 import { useGameStateStore } from '../stores/gameStateStore'
 import PlayerRound from './player/PlayerRound'
-import PlayerReserves from './player/PlayerReserves'
-import GameCompletionScreen from './player/GameCompletionScreen'
+import PlayerAllocation from './player/PlayerAllocation'
 import { createAllocation } from '../lib/supabase'
 import { useAuthStore } from '../stores'
 
 interface PlayerGameScreenProps {
   userId?: string
   userName: string
-  onBackToHome: () => void
   onSignOut: () => void
 }
 
 export default function PlayerGameScreen({
   userName,
-  onBackToHome,
   onSignOut
 }: PlayerGameScreenProps) {
   // Get state from stores
@@ -30,7 +27,7 @@ export default function PlayerGameScreen({
 
   const [showEventModal, setShowEventModal] = useState(false)
   const [previousRound, setPreviousRound] = useState(currentRound)
-  const [gameCompleted, setGameCompleted] = useState(false)
+  const [showAllocation, setShowAllocation] = useState(false)
 
   // Show event modal when round is completed and has event
   useEffect(() => {
@@ -50,14 +47,6 @@ export default function PlayerGameScreen({
   // Listen to messages from room
   useEffect(() => {
     if (!room) return
-
-    // Listen for game completion
-    const handleGameCompleted = () => {
-      console.log('[PlayerGameScreen] Game completed!')
-      setGameCompleted(true)
-    }
-
-    room.onMessage('game_completed', handleGameCompleted)
 
     return () => {
       // Cleanup listeners
@@ -96,10 +85,6 @@ export default function PlayerGameScreen({
 
   // Check if game is completed (round 102 = 120 years old)
   useEffect(() => {
-    if (currentRound >= 102 && currentRoundStatus === 'completed') {
-      setGameCompleted(true)
-    }
-
     const timeEnded = (currentRound === 1 && currentRoundStatus === 'completed') || (currentRound !== 1 && currentRoundStatus === 'wheel')
     const allocation = allocationHistory[currentRound]
 
@@ -108,15 +93,11 @@ export default function PlayerGameScreen({
     }
   }, [currentRound, currentRoundStatus])
 
-  // Handle completion
-  const handleComplete = () => {
-    onBackToHome()
-  }
-
-  // Show completion screen
-  if (gameCompleted) {
-    return <GameCompletionScreen onComplete={handleComplete} />
-  }
+  useEffect(() => {
+    if (currentRoundStatus !== 'timer') {
+      setShowAllocation(false)
+    }
+  }, [currentRoundStatus])
 
   if (!room) {
     return (
@@ -154,13 +135,14 @@ export default function PlayerGameScreen({
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentRoundStatus === 'timer' ? (
-          <PlayerReserves />
+        {currentRoundStatus === 'timer' && showAllocation ? ( // Chưa submit điểm mới hiển thị
+          <PlayerAllocation />
         ) : (
           <PlayerRound
             currentCell={currentRound + 17}
-            isRoundActive={currentRoundStatus !== 'default'}
-            onPlay={() => { }}
+            isRoundActive={currentRoundStatus === 'timer' && !showAllocation} // Người dùng đã submit điểm cũng inactive
+            onPlay={() => { setShowAllocation(true) }}
+            isCompleted={currentRound === 102 && currentRoundStatus === 'completed'}
           />
         )}
       </div>

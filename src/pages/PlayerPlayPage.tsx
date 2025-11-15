@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { colyseusClient } from '../lib/colyseus'
@@ -25,7 +25,6 @@ export default function PlayerPlayPage({
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const hasFetchedRef = useRef(false)
 
   // Use stores
   const { room, setRoom, clearRoom } = useGameRoomStore()
@@ -33,79 +32,21 @@ export default function PlayerPlayPage({
   const setGameState = useGameStateStore(state => state.setGameState)
 
   useEffect(() => {
-    if (hasFetchedRef.current) {
-      console.log('[PlayerPlayPage] Already initialized, skipping')
-      return
-    }
-
-    hasFetchedRef.current = true
     initializePlayer()
 
     return () => {
       // Cleanup: leave room on unmount
       const currentRoom = room
       if (currentRoom) {
-        console.log('[PlayerPlayPage] Leaving room on unmount')
         currentRoom.leave()
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Track user online status with heartbeat while playing
-  // useEffect(() => {
-  //   const setupHeartbeat = async () => {
-  //     try {
-  //       const { data: { user } } = await supabase.auth.getUser()
-  //       if (!user) return
-
-  //       // Update last_seen timestamp
-  //       const updateOnlineStatus = async () => {
-  //         const { error } = await supabase
-  //           .from('profiles')
-  //           .update({ last_seen: new Date().toISOString() })
-  //           .eq('id', user.id)
-
-  //         if (error) {
-  //           console.error('[PlayerPlayPage] Error updating last_seen:', error)
-  //         } else {
-  //           console.log('[PlayerPlayPage] Last seen updated')
-  //         }
-  //       }
-
-  //       // Initial update
-  //       await updateOnlineStatus()
-
-  //       // Update every 30 seconds
-  //       const heartbeatInterval = setInterval(updateOnlineStatus, 30000)
-
-  //       // Cleanup: set last_seen to null when leaving
-  //       return () => {
-  //         clearInterval(heartbeatInterval)
-  //         supabase
-  //           .from('profiles')
-  //           .update({ last_seen: null })
-  //           .eq('id', user.id)
-  //           .then(() => console.log('[PlayerPlayPage] Last seen cleared'))
-  //       }
-  //     } catch (err) {
-  //       console.error('[PlayerPlayPage] Error setting up heartbeat:', err)
-  //     }
-  //   }
-
-  //   const cleanup = setupHeartbeat()
-    
-  //   return () => {
-  //     cleanup.then((fn) => fn && fn())
-  //   }
-  // }, [userId, userName])
 
   const initializePlayer = async () => {
     try {
       setLoading(true)
       setError(null)
-
-      console.log('[PlayerPlayPage] Initializing player...')
 
       // 1. Check for active room
       const activeRoom = await getActiveGameRoom()
@@ -124,7 +65,7 @@ export default function PlayerPlayPage({
         }) as any // Type will be inferred from store
 
         if (colyseusRoom.state) {
-          setGameState({ ...colyseusRoom.state })
+          setGameState(colyseusRoom.state)
         }
 
         // Store room in player state store
@@ -185,7 +126,7 @@ export default function PlayerPlayPage({
     let previousEvent = room.state.currentRoundEvent
 
     room.onStateChange((state: any) => {
-      setGameState({ ...state })
+      setGameState(state)
       
       // Sync event data when round completes with an event
       if (state.currentRoundStatus === 'completed' && state.currentRoundEvent && state.currentRoundEvent !== previousEvent) {
@@ -275,7 +216,6 @@ export default function PlayerPlayPage({
     <PlayerGameScreen
       userId={userId}
       userName={userName}
-      onBackToHome={handleBackToHome}
       onSignOut={onSignOut}
     />
   )

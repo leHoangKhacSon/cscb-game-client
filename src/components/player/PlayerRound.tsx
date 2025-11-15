@@ -1,4 +1,6 @@
 import { useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+
 import { usePlayerStateStore } from '../../stores'
 
 // Import PNG icons
@@ -17,13 +19,16 @@ interface PlayerRoundProps {
   currentCell: number // 1-120
   isRoundActive: boolean
   onPlay: () => void
+  isCompleted: boolean
 }
 
 export default function PlayerRound({
   currentCell,
   isRoundActive,
-  onPlay
+  onPlay,
+  isCompleted
 }: PlayerRoundProps) {
+  const navigate = useNavigate()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const { playerScores } = usePlayerStateStore()
 
@@ -63,23 +68,28 @@ export default function PlayerRound({
 
   const getCellStyle = (cell: number) => {
     const status = getCellStatus(cell)
-    
+
     const baseStyle = 'flex items-center justify-center rounded-2xl font-bold transition-all duration-300 flex-shrink-0'
-    
+
     if (status === 'current') {
       return `${baseStyle} w-24 h-24 bg-green-600 text-white text-4xl shadow-lg`
     }
-    
+
     if (status === 'disabled') {
       return `${baseStyle} w-20 h-20 bg-gray-200 text-gray-400 text-2xl`
     }
-    
+
     return `${baseStyle} w-20 h-20 bg-white border-2 border-gray-300 text-gray-700 text-2xl`
   }
 
   // Icons for stats (left 5, right 5)
   const leftIcons = [HealthIcon, FinanceIcon, IntelligenceIcon, EmotionIcon, CommunityIcon]
   const rightIcons = [CareerIcon, SpiritualIcon, CultureIcon, AiIcon, EnvironmentIcon]
+
+  // Handle completion
+  const onViewResults = () => {
+    navigate('/completed')
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -102,8 +112,14 @@ export default function PlayerRound({
         </div>
       </div>
 
-      {/* Play Button */}
-      <div className="flex-shrink-0 flex justify-center py-8">
+      {isCompleted ? <div className="flex-shrink-0 flex justify-center py-8">
+        <button
+          onClick={onViewResults}
+          className="px-16 py-4 rounded-2xl font-bold text-xl transition-all duration-200 bg-green-600 text-white shadow-lg active:scale-95"
+        >
+          Xem kết quả
+        </button>
+      </div> : <div className="flex-shrink-0 flex justify-center py-8">
         <button
           onClick={onPlay}
           disabled={!isRoundActive}
@@ -117,7 +133,7 @@ export default function PlayerRound({
         >
           Chơi
         </button>
-      </div>
+      </div>}
 
       {/* Stats Table */}
       <div className="flex-1 px-6 py-4 overflow-y-auto">
