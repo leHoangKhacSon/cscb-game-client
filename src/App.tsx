@@ -10,6 +10,8 @@ import PlayerHomePage from './pages/PlayerHomePage'
 import PlayerPlayPage from './pages/PlayerPlayPage'
 import PlayerResults from './pages/mock/PlayerResults'
 import FacilitatorResults from './pages/mock/FacilitatorResults'
+import FacilitatorCompletedPage from './pages/FacilitatorCompletedPage'
+import PlayerCompletedPage from './pages/PlayerCompletedPage'
 
 function App() {
   const { user, profile, loading, error, signOut, isFacilitator, isAuthenticated, needsDisplayName, updateDisplayName, initialize } = useAuthStore()
@@ -83,7 +85,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        
+
         {isFacilitator ? (
           // Facilitator routes
           <>
@@ -103,6 +105,12 @@ function App() {
                   userName={userName}
                   onSignOut={signOut}
                 />
+              }
+            />
+            <Route
+              path="/completed"
+              element={
+                <FacilitatorCompletedPage />
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -130,7 +138,13 @@ function App() {
                   onSignOut={signOut}
                 />
               }
-            />
+              />
+              <Route
+                path="/completed"
+                element={
+                  <PlayerCompletedPage />
+                }
+              />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         )}
