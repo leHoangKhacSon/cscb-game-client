@@ -7,6 +7,7 @@ import MainBoard from './MainBoard'
 import { EVENTS, FACTORS } from '../constants/events'
 import type { FactorKey } from '../types/index'
 import CountdownTimer from './facilitator/CountdownTimer'
+import GameResultsScreen from './facilitator/GameResultsScreen'
 
 interface GameBoardProps {
   room: Room
@@ -18,6 +19,7 @@ interface GameBoardProps {
 
 export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps) {
   const [players, setPlayers] = useState<Map<string, PlayerState>>(new Map())
+  const [showResults, setShowResults] = useState(false)
 
   // Setup message listeners for UI-specific events
   useEffect(() => {
@@ -105,6 +107,18 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
   const renderBtn = () => {
     const status = gameState.currentRoundStatus
 
+    // Show results button when game is completed (round 18)
+    if (gameState.currentRound === 102 && status === 'completed') {
+      return (
+        <button
+          onClick={() => setShowResults(true)}
+          className="w-full py-4 rounded-2xl font-bold text-xl transition-all uppercase bg-purple-500 hover:bg-purple-600 text-white shadow-lg"
+        >
+          Xem kết quả
+        </button>
+      )
+    }
+
     if (status === 'completed') {
       return (
         <button
@@ -147,13 +161,29 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      {/* Logout Button - Top Right */}
-      <button
-        onClick={onSignOut}
-        className="absolute top-4 right-4 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors z-50"
-      >
-        Đăng xuất
-      </button>
+      {/* Game Results Modal */}
+      {showResults && gameState.dbRoomId && (
+        <GameResultsScreen
+          roomId={gameState.dbRoomId}
+          onClose={() => setShowResults(false)}
+        />
+      )}
+
+      {/* Top Right Buttons */}
+      <div className="absolute top-4 right-4 flex gap-2 z-50">
+        <button
+          onClick={() => setShowResults(true)}
+          className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200"
+        >
+          📊 Xem kết quả
+        </button>
+        <button
+          onClick={onSignOut}
+          className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          Đăng xuất
+        </button>
+      </div>
 
       {/* Main Content - 2 Column Layout */}
       <div className="flex gap-4 h-[calc(100vh-2rem)]">
