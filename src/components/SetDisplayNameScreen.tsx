@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import logoutIcon from '../assets/icons/logout.png'
+
 interface SetDisplayNameScreenProps {
   email: string
   onSubmit: (displayName: string) => Promise<void>
@@ -55,7 +57,7 @@ export default function SetDisplayNameScreen({ email, onSubmit, onSignOut }: Set
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Đăng xuất"
               >
-                <img src="/src/assets/icons/logout.png" alt="Logout" className="w-6 h-6" />
+                <img src={logoutIcon} alt="Logout" className="w-6 h-6" />
               </button>
             </div>
           </div>

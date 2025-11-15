@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import logoutIcon from '../assets/icons/logout.png'
 import { getActiveGameRoom, supabase } from '../lib/supabase'
 import type { Room as DatabaseRoom } from '../lib/supabase'
 import { colyseusClient } from '../lib/colyseus'
@@ -253,7 +254,7 @@ export default function FacilitatorHomePage({ onSignOut }: FacilitatorHomePagePr
         className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
         title="Đăng xuất"
       >
-        <img src="/src/assets/icons/logout.png" alt="Logout" className="w-8 h-8" />
+        <img src={logoutIcon} alt="Logout" className="w-8 h-8" />
       </button>
 
       {/* Main Content */}

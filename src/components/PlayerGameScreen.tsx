@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import logoutIcon from '../assets/icons/logout.png'
 import EventNotification from './EventNotification'
 import { usePlayerStateStore } from '../stores/playerStateStore'
 import { useGameRoomStore } from '../stores/gameRoomStore'
@@ -126,7 +127,7 @@ export default function PlayerGameScreen({
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Đăng xuất"
               >
-                <img src="/src/assets/icons/logout.png" alt="Logout" className="w-6 h-6" />
+                <img src={logoutIcon} alt="Logout" className="w-6 h-6" />
               </button>
             </div>
           </div>

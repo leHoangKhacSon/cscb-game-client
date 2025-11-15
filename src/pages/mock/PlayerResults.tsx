@@ -1,4 +1,5 @@
 import GameCompletionScreen from "../../components/player/GameCompletionScreen";
+import logoutIcon from '../../assets/icons/logout.png'
 
 export default function PlayerResults() {
   return (
@@ -20,7 +21,7 @@ export default function PlayerResults() {
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Đăng xuất"
               >
-                <img src="/src/assets/icons/logout.png" alt="Logout" className="w-6 h-6" />
+                <img src={logoutIcon} alt="Logout" className="w-6 h-6" />
               </button>
             </div>
           </div>

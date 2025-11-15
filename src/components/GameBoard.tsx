@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Room } from 'colyseus.js'
 
+import doneIcon from '../assets/icons/done.png'
+import progressIcon from '../assets/icons/progress.png'
 import { GameRoomState, PlayerState } from '../types/colyseus'
 import EventWheel from './EventWheel'
 import MainBoard from './MainBoard'
@@ -273,9 +275,9 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
                   </div>
                   <div>
                     {player.hasFilled ? (
-                      <img src="/src/assets/icons/done.png" alt="Done" className="w-6 h-6" />
+                      <img src={doneIcon} alt="Done" className="w-6 h-6" />
                     ) : (
-                      <img src="/src/assets/icons/progress.png" alt="In Progress" className="w-6 h-6" />
+                      <img src={progressIcon} alt="In Progress" className="w-6 h-6" />
                     )}
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import logoutIcon from '../assets/icons/logout.png'
 import { getActiveGameRoom, supabase, type Room } from '../lib/supabase'
 import LoadingSpinner from '../components/LoadingSpinner'
 
@@ -129,7 +130,7 @@ export default function PlayerHomePage({ userId, userName, onSignOut }: PlayerHo
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Đăng xuất"
               >
-                <img src="/src/assets/icons/logout.png" alt="Logout" className="w-6 h-6" />
+                <img src={logoutIcon} alt="Logout" className="w-6 h-6" />
               </button>
             </div>
           </div>
