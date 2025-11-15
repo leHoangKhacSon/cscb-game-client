@@ -187,24 +187,25 @@ export default function PlayerReserves({
 
       {/* Factor Icons - Scrollable */}
       <div className="mb-6">
-        <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-2">
+        <div className="flex gap-x-2 overflow-x-auto scrollbar-hide pb-2">
           {Object.keys(FACTORS).map((key: string, index) => {
             const { icon } = FACTORS[key as EFactor]
             return (
               <div
                 key={key}
                 className={`
-                  flex-shrink-0 w-20 h-20 rounded-xl border-2 flex flex-col items-center justify-center
-                  transition-all duration-200 cursor-pointer
+                  flex-shrink-0 w-12 h-20 rounded-xl border-2 flex flex-col items-center justify-center
+                  transition-all duration-200 cursor-pointer bg-white
                   ${key === selectedFactor
-                    ? 'border-gray-800 bg-gray-100 scale-110'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                    ? 'scale-125'
+                    : ''
                   }
                 `}
                 onClick={handleSelectFactor(key as EFactor)}
               >
                 <span className="text-xs text-gray-600 mb-1">{index + 1}</span>
                 <img src={icon} alt={FACTORS[key as EFactor].name} className="w-8 h-8" />
+                <span className="text-xs text-gray-600 mb-1">{allocations[key] || 0}</span>
               </div>
             )
           })}
