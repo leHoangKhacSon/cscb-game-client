@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Room } from 'colyseus.js'
+import { useNavigate } from 'react-router-dom'
 
 import doneIcon from '../assets/icons/done.png'
 import progressIcon from '../assets/icons/progress.png'
@@ -9,7 +10,6 @@ import MainBoard from './MainBoard'
 import { EVENTS, FACTORS } from '../constants/events'
 import type { FactorKey } from '../types/index'
 import CountdownTimer from './facilitator/CountdownTimer'
-import GameResultsScreen from './facilitator/GameResultsScreen'
 
 interface GameBoardProps {
   room: Room
@@ -20,8 +20,10 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps) {
+  const navigate = useNavigate()
+
   const [players, setPlayers] = useState<Map<string, PlayerState>>(new Map())
-  const [showResults, setShowResults] = useState(false)
+  const [rotation, setRotation] = useState(0)
 
   // Setup message listeners for UI-specific events
   useEffect(() => {
@@ -59,7 +61,6 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
     // Start the round when clicking on the cell
     handleStartRound(year)
   }
-  const [rotation, setRotation] = useState(0)
 
   // Handle event wheel spin
   const handleSpinWheel = () => {
@@ -83,6 +84,8 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
     console.log('[GameBoard] Continue to next round')
     room.send('continue_to_next')
   }
+
+  const onViewResult = () => navigate('/completed')
 
   const renderMainGameBoard = () => {
     const status = gameState.currentRoundStatus;
@@ -109,11 +112,10 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
   const renderBtn = () => {
     const status = gameState.currentRoundStatus
 
-    // Show results button when game is completed (round 18)
     if (gameState.currentRound === 102 && status === 'completed') {
       return (
         <button
-          onClick={() => setShowResults(true)}
+          onClick={onViewResult}
           className="w-full py-4 rounded-2xl font-bold text-xl transition-all uppercase bg-purple-500 hover:bg-purple-600 text-white shadow-lg"
         >
           Xem kết quả
@@ -163,22 +165,8 @@ export default function GameBoard({ room, gameState, onSignOut }: GameBoardProps
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      {/* Game Results Modal */}
-      {showResults && gameState.dbRoomId && (
-        <GameResultsScreen
-          roomId={gameState.dbRoomId}
-          onClose={() => setShowResults(false)}
-        />
-      )}
-
       {/* Top Right Buttons */}
       <div className="absolute top-4 right-4 flex gap-2 z-50">
-        <button
-          onClick={() => setShowResults(true)}
-          className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200"
-        >
-          📊 Xem kết quả
-        </button>
         <button
           onClick={onSignOut}
           className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"

@@ -1,13 +1,16 @@
 import GameResultsScreen from "../components/facilitator/GameResultsScreen";
-import { MOCK_GAME_DATA } from '../lib/mockData'
+import { useGameRoomStore } from '../stores/gameRoomStore'
 
-export default function FacilitatorCompletedPage() {
+const FacilitatorCompletedPage = () => {
+  const roomId = useGameRoomStore(state => state.roomId)
+
   return (
     <div>
       <GameResultsScreen
-        roomId={MOCK_GAME_DATA.roomId}
-        onClose={() => { }}
+        roomId={roomId}
       />
     </div>
   )
 }
+
+export default FacilitatorCompletedPage

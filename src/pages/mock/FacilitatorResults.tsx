@@ -6,7 +6,6 @@ export default function FacilitatorResults() {
     <div>
       <GameResultsScreen
         roomId={MOCK_GAME_DATA.roomId}
-        onClose={() => { }}
       />
     </div>
   )

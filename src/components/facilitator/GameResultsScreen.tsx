@@ -12,11 +12,10 @@ interface PlayerResult extends PlayerScoreData {
 }
 
 interface GameResultsScreenProps {
-  roomId: string
-  onClose: () => void
+  roomId: string | null
 }
 
-export default function GameResultsScreen({ roomId, onClose }: GameResultsScreenProps) {
+export default function GameResultsScreen({ roomId }: GameResultsScreenProps) {
   const [results, setResults] = useState<PlayerResult[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'finalDestiny' | 'balanceIndex' | 'impactIndex' | 'efficiencyIndex'>('finalDestiny')
@@ -216,6 +215,12 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
     document.body.removeChild(link)
   }
 
+  if (!roomId) {
+    return (
+      <div>Hiện không có trò chơi nào hoàn thành</div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -229,24 +234,6 @@ export default function GameResultsScreen({ roomId, onClose }: GameResultsScreen
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg z-10">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-3xl font-bold mb-2">🏆 Kết Quả Trò Chơi</h2>
-              <p className="text-blue-100">Phân tích chi tiết theo công thức Final Destiny</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
         {/* Filter by Player Type */}
         <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-pink-50">
           <div className="flex items-center gap-3 mb-4">

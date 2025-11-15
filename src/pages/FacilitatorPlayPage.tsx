@@ -24,23 +24,6 @@ export default function FacilitatorPlayPage({
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Extract state from Colyseus Schema
-  // const extractGameState = useCallback((state: any): GameRoomState => {
-  //   return {
-  //     dbRoomId: state.dbRoomId || '',
-  //     status: state.status || 'active',
-  //     facilitatorId: state.facilitatorId || '',
-  //     currentRound: state.currentRound || 1,
-  //     currentRoundStatus: state.currentRoundStatus || 'default',
-  //     currentRoundEvent: '',
-  //     timerSeconds: state.timerSeconds || 0,
-  //     timerStart: state.timerStart || 0,
-  //     players: state.players || new Map(),
-  //     lastEventDescription: state.lastEventDescription || '',
-  //     playerCount: state.playerCount || 0
-  //   }
-  // }, [])
-
   // Setup room listeners
   useEffect(() => {
     if (!room) {
@@ -63,32 +46,6 @@ export default function FacilitatorPlayPage({
       // const stateData = extractGameState(state)
       setGameState({ ...state })
     })
-
-    // Listen to specific field changes using Colyseus Schema listeners
-    // const unsubscribeRound = room.state.listen('currentRound', (value: number) => {
-    //   console.log('[FacilitatorPlayPage] currentRound changed:', value)
-    //   updateGameState({ ...gameState, currentRound: value })
-    // })
-
-    // const unsubscribeTimerSeconds = room.state.listen('timerSeconds', (value: number) => {
-    //   console.log('[FacilitatorPlayPage] timerSeconds changed:', value)
-    //   updateGameState({ ...gameState, timerSeconds: value })
-    // })
-
-    // const unsubscribePlayerCount = room.state.listen('playerCount', (value: number) => {
-    //   console.log('[FacilitatorPlayPage] playerCount changed:', value)
-    //   updateGameState({ ...gameState, playerCount: value })
-    // })
-
-    // Listen to player join events
-    // room.state.players?.onAdd((player: PlayerState, sessionId: string) => {
-    //   console.log('[FacilitatorPlayPage] Player joined:', player.displayName, sessionId)
-    // })
-
-    // Listen to player leave events
-    // room.state.players?.onRemove((player: PlayerState, sessionId: string) => {
-    //   console.log('[FacilitatorPlayPage] Player left:', player.displayName, sessionId)
-    // })
 
     room.onMessage('session_ended', () => {
       console.log('[FacilitatorPlayPage] Session ended, navigating to home')
@@ -120,9 +77,6 @@ export default function FacilitatorPlayPage({
     // Cleanup on unmount
     return () => {
       console.log('[FacilitatorPlayPage] Cleaning up room listeners')
-      // unsubscribeRound()
-      // unsubscribeTimerSeconds()
-      // unsubscribePlayerCount()
       room.removeAllListeners()
     }
   }, [room, navigate, setGameState, updateGameState])
