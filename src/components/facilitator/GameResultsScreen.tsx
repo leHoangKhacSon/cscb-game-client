@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
 import { supabase, FACTOR_LABELS } from '../../lib/supabase'
 import { FactorKey } from '../../types/events'
 import LoadingSpinner from '../LoadingSpinner'
 import { calculatePlayerScore, PlayerScoreData, PLAYER_TYPES } from '../../lib/scoreCalculator'
+import { useGameRoomStore } from '../../stores'
 
 interface PlayerResult extends PlayerScoreData {
   userId: string
@@ -16,6 +19,9 @@ interface GameResultsScreenProps {
 }
 
 export default function GameResultsScreen({ roomId }: GameResultsScreenProps) {
+  const navigate = useNavigate()
+  const room = useGameRoomStore(state => state.room)
+
   const [results, setResults] = useState<PlayerResult[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'finalDestiny' | 'balanceIndex' | 'impactIndex' | 'efficiencyIndex'>('finalDestiny')
@@ -215,6 +221,17 @@ export default function GameResultsScreen({ roomId }: GameResultsScreenProps) {
     document.body.removeChild(link)
   }
 
+  const handleEndSession = () => {
+    if (!room) {
+      console.log('[FacilitatorPlayPage] No room available, redirecting to home')
+      navigate('/')
+      return
+    }
+
+    console.log('[GameBoard] Ending session')
+    room.send('end_session')
+  }
+
   if (!roomId) {
     return (
       <div>Hiện không có trò chơi nào hoàn thành</div>
@@ -232,10 +249,9 @@ export default function GameResultsScreen({ roomId }: GameResultsScreenProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-2xl w-full overflow-y-auto">
         {/* Filter by Player Type */}
-        <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-pink-50">
+        <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-pink-50 flex items-center justify-between">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-gray-700 font-medium">Lọc theo loại:</span>
             <div className="flex flex-wrap gap-2">
@@ -268,6 +284,11 @@ export default function GameResultsScreen({ roomId }: GameResultsScreenProps) {
                 )
               })}
             </div>
+          </div>
+          <div>
+            <button className="bg-red-500 px-4 py-2 rounded-xl text-white hover:opacity-80" onClick={handleEndSession}>
+              Kết thúc
+            </button>
           </div>
         </div>
 
@@ -443,7 +464,6 @@ export default function GameResultsScreen({ roomId }: GameResultsScreenProps) {
           )}
         </div>
       </div>
-    </div>
   )
 }
 
